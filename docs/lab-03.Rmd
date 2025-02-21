@@ -1,0 +1,10 @@
+---
+title: "lab 3: COVID-19"
+subtitle: 'Ecosystem Science and Sustainability 330'
+author:
+  - name: Megan Hoover
+    email: megan.hoover21@gmail.com
+format: html
+output: html_document
+---
+
