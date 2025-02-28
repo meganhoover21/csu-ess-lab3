@@ -1,0 +1,63 @@
+---
+title: "lab 3: COVID-19"
+subtitle: 'Ecosystem Science and Sustainability 330'
+author:
+  - name: Megan Hoover
+    email: megan.hoover21@gmail.com
+format: html
+output: html_document
+---
+
+## Q2: Lets pretend it in January 1st, 2022. You are a data scientist for the state of Colorado Department of Public Health.
+
+You’ve been tasked with giving a report to Governor Polis each morning about the most current COVID-19 conditions at the county level.
+
+As it stands, the Colorado Department of Public Health maintains a watch list of counties that are being monitored for worsening corona virus trends. There are six criteria used to place counties on the watch list:
+
+1.Doing fewer than 150 tests per 100,000 residents daily (over a 7-day average)
+2.More than 100 new cases per 100,000 residents over the past 14 days…
+3.25 new cases per 100,000 residents and an 8% test positivity rate
+4.10% or greater increase in COVID-19 hospitalized patients over the past 3 days
+5.Fewer than 20% of ICU beds available
+6.Fewer than 25% ventilators available
+Of these 6 conditions, you are in charge of monitoring condition number 2.
+
+To do this job well, you should set up a reproducible framework to communicate the following in a way that can be updated every time new data is released (daily):
+
+1. cumulative cases in the 5 worst counties
+2. total NEW cases in the 5 worst counties
+3. A list of safe counties
+4. A text report describing the total new cases, total cumulative cases, and number of safe counties.
+You should build this analysis in such a way that running it will extract the most current data straight from the NY-Times URL and the state name and date are parameters that can be changed allowing this report to be run for other states/dates.
+
+```{r}
+#Download libraries,read in COVID-19 Data, and prepare data table for calculations
+library(tidyverse) #data wrangling and visualization) 
+
+library(flextable) #make nice tables)
+
+library(zoo) #(rolling averages
+
+url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
+covid_raw<-read_csv(url)
+
+#create my.date and my.state object. Set my date to "2022-02-01" and my state to "colorado"
+my.date <- "2022-02-01" 
+  class(my.date)
+date<-my.date %>%
+  as.Date()
+class(date)
+my.state <- "Colorado"
+
+#Start by making a subset that limits (filter) the data to Colorado and add a new column (mutate) with the daily new cases using diff/lag by county (group_by). Do the same for new deaths as well.
+
+#(Hint: you will need some combination of filter, group_by, arrange, mutate, diff/lag, and ungroup)
+
+covid1<-covid_raw %>%
+  filter(state=="Colorado") %>%
+  drop_na() %>%
+  group_by(county) %>%
+  mutate(daily_new_cases= cases-lag(cases),
+         daily_new_deaths= deaths- lag(deaths)) %>%
+  arrange(county,date) %>%
+  ungroup()
