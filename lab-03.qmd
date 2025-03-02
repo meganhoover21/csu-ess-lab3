@@ -66,13 +66,63 @@ my.state <- "Colorado"
 
 #(Hint: you will need some combination of filter, group_by, arrange, mutate, diff/lag, and ungroup)
 
-covid1<-covid_raw %>%
-  filter(state=="Colorado") %>%
-  drop_na() %>%
+covid1 = covid_raw %>%
+  filter(state == my.state) %>%
+  arrange(county, date) %>%
   group_by(county) %>%
-  mutate(daily_new_cases= cases-lag(cases),
-         daily_new_deaths= deaths- lag(deaths)) %>%
-  arrange(county,date) %>%
+  mutate(
+    new_cases = cases - lag(cases, order_by = date),
+    new_deaths = deaths - lag(deaths, order_by = date)
+  ) %>%
   ungroup()
+
+head(covid1)
+```
+
+# filter the data to include only records for the date my.date, which is 2022-02-01.
+```{r}
+top_cum_cases <- covid1 %>%
+  filter(date== my.date) %>%
+  arrange(desc(cases)) %>%
+  select(county, cases) %>%
+  head(5)
+
+top_new_cases <- covid1 %>%
+  filter(date== my.date) %>%
+  arrange(desc(new_cases)) %>%
+  select(county, new_cases) %>%
+  head(5)
+```
+
+# Using your subset, generate (2) tables. The first should show the 5 counties with the most CUMULATIVE cases, and the second should show the 5 counties with the most NEW cases. Remember to use your my.date object as a proxy for today’s date:
+```{r}
+flex_top_cumcases = flextable(top_cum_cases)
+  flex_top_cumcases %>%
+  set_caption("Top 5 Counties with the Most Cumulative Cases as of 2022-02-01")
+  
+print(flex_top_cumcases)
+
+flex_new_cases = flextable(top_new_cases)
+flex_new_cases %>% 
+  set_caption("Top 5 Counties with the Most New Cases as of 2022-02-01")
+
+print(flex_new_cases)
+
+```
+
+# Population data is offered by the Census. Please read in this data.
+```{r}
+pop_url <- 'https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/counties/totals/co-est2023-alldata.csv'
+
+pop_covid_raw <-read_csv(pop_url)
+```
+
+# You notice that the COVID data provides a 5 digit character FIP code representing the state in the first 2 digits and the county in the last 3. In the population data, the STATE and COUNTY FIP identifiers are read in as numerics. To make these compatible we need to:
+
+1.Convert the STATE numeric into a character forced to 2 digits with a leading 0 (when needed)
+2.Convert the COUNTY numeric into a character forced to 3 digits with leading 0’s (when needed)
+3.Create a FIP variable the STATE numeric into a character forced to 2 digits with a leading 0 (when needed)
+```{r}
+
 ```
 
