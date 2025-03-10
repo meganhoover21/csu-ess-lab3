@@ -231,4 +231,63 @@ top_new_cases_per_cap_flex<- flextable(top_new_cases_per_capita) %>%
   print(top_new_cases_per_cap_flex)
 ```
 
+# Q 4: Question 4: Rolling thresholds
+Filter the merged COVID/Population data to only include the last 14 days. Remember this should be a programmatic request and not hard-coded. Then, use the group_by/summarize paradigm to determine the total number of new cases in the last 14 days per 100,000 people. Print a table of the top 5 counties, and, report the number that meet the watch list condition: “More than 100 new cases per 100,000 residents over the past 14 days…”
+
+(Hint: Dates are numeric in R and thus operations like max min, -, +, >, and< work.)
+```{r}
+# Step 1-4: Filter, Summarize, Identify Watch List, and Display Results in One Flow
+merged_14d<-merged_data %>%
+  filter(date >= max(date) - 13) %>%
+  group_by(county) %>%
+  summarize(
+    total_new_cases_14d = sum(new_cases, na.rm = TRUE),
+    cases_per_100k_14d = (total_new_cases_14d / POPESTIMATE2021[1]) * 100000
+  ) %>%
+   filter(cases_per_100k_14d > 100) %>% #need to filter by the total new cases
+  arrange(desc(total_new_cases_14d)) #always filter before arrange
+  
+
+#to make watch list
+   watch_list <- filter(merged_14d,cases_per_100k_14d > 100)
+   
+   
+    
+    # Display Top 5 Counties Table
+    merged_14d_flex<- merged_14d %>%
+      slice_max(total_new_cases_14d, n=5 )%>% #tell it which column to sort
+      flextable() %>%
+      set_caption("Top 5 Colorado Counties with Most New Cases Per Capita (Last 14 Days)") %>%
+      autofit() %>%
+      print()
+
+```
+
+
+There are `r nrow(watch_list)` counties under watch.
+
+# Q 5: Given we are assuming it is February 1st, 2022. Your leadership has asked you to determine what percentage of deaths in each county were attributed to COVID last year (2021). You eagerly tell them that with the current Census data, you can do this!
+
+From previous questions you should have a data.frame with daily COVID deaths in Colorado and the Census based, 2021 total deaths. For this question, you will find the ratio of total COVID deaths per county (2021) of all recorded deaths. In a plot of your choosing, visualize all counties where COVID deaths account for 20% or more of the annual death toll.
+
+Dates in R
+
+```{r}
+covid.county_2021totaldeaths <-merged_data %>%
+filter(date == my.date) %>%#filter to the my data 2021 date
+ #create new data frame with sum of new_deaths
+   mutate(death_ratio = deaths / DEATHS2021) %>% #this gives the ratio of cumulative deaths to deaths of 2021
+
+  
+#barplot of counties of COVID deaths 20% or greater than total deaths in 2021
+ggplot(covid.county_2021totaldeaths, aes(x = reorder(county, death_ratio), y = death_ratio)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() + 
+  labs(
+    title = "Counties Where COVID Deaths Account for 20% or More of Total Deaths in 2021",
+    x = "County",
+    y = "COVID Deaths as Percentage of Total Deaths"
+  ) +
+  theme_minimal()
+```
 
