@@ -291,3 +291,77 @@ ggplot(covid.county_2021totaldeaths, aes(x = reorder(county, death_ratio), y = d
   theme_minimal()
 ```
 
+# Q 6: In this question, we are going to look at the story of 4 states and the impact scale can have on data interpretation. The states include: New York, Colorado, Alabama, and Ohio. Your task is to make a faceted bar plot showing the number of daily, new cases at the state level.
+```{r}
+# Step 1: Group the data to the state level and calculate daily new cases
+state_data <- covid_raw %>%
+  group_by(state, date) %>% 
+  summarize(
+    totalcum_cases = sum(cases, na.rm = TRUE), # Sum the cumulative cases for each state
+    totalcum_deaths = sum(deaths, na.rm = TRUE), # Sum the total deaths for each state
+    .groups = "drop"
+  ) %>%
+  arrange(state, date) %>%
+   mutate(
+    daily_new_cases = totalcum_cases - lag(totalcum_cases, default = first(totalcum_cases)),  # Calculate daily new cases
+    rolling_mean_7days = rollmean(daily_new_cases, k = 7, fill = NA, align = "center", na.rm= TRUE)  # 7-day rolling mean
+  )
+
+# Step 2: Filter for the four states (New York, Colorado, Alabama, Ohio)
+ selected_states <- c("New York", "Colorado", "Alabama", "Ohio")
+ 
+
+filtered_state_data <- state_data %>%
+  filter(state %in% selected_states)
+
+```
+
+#Q 6.2: Using the modified data, make a facet plot of the daily new cases and the 7-day rolling mean. Your plot should use compelling geoms, labels, colors, and themes.
+```{r}
+# Create a simpler bar plot with the 7-day rolling mean
+ggplot(filtered_state_data, aes(x = date)) +
+  # Bar plot for daily new cases
+  geom_bar(aes(y = daily_new_cases), stat = "identity", fill = "skyblue", color = "black", width = 0.8) +
+  # Line plot for 7-day rolling mean
+  geom_line(aes(y = rolling_mean_7days), color = "darkred", size = 1) +
+  # Facet by state
+  facet_wrap(~ state, scales = "free_y") +
+  # Labels and title
+  labs(
+    title = "Daily New COVID-19 Cases and 7-Day Rolling Mean by State",
+    x = "Date",
+    y = "Number of Cases",
+    caption = "Bars represent daily new cases. The red line is the 7-day rolling mean."
+  ) +
+  # Simplified theme
+  theme_minimal() 
+
+```
+
+# Q 6.3: The story of raw case counts can be misleading. To understand why, lets explore the cases per capita of each state. To do this, join the state COVID data to the population estimates and calculate the newcases/totalpopulation. Additionally, calculate the 7-day rolling mean of the new cases per capita counts. This is a tricky task and will take some thought, time, and modification to existing code (most likely)!
+```{r}
+#create covid data frame with state info
+covid2_states <- covid_raw %>%
+  group_by(state, date) %>%  # Group by state and date to summarize data at the state level
+  mutate(
+    daily_new_cases = sum(cases) - lag(sum(cases), default = 0),  # Calculate daily new cases
+    daily_new_deaths = sum(deaths) - lag(sum(deaths), default = 0)) %>% # Calculate daily new deaths
+      ungroup()
+  
+  #create new pop data frame with state data
+pop_covid2_states <- pop_covid_raw %>%
+  mutate(state_fips = sprintf("%02s", STATE), #for character use %02s
+         county_fips = sprintf("%03s", COUNTY)) %>%
+  mutate(fips_code = paste(state_fips, county_fips, sep = "")) %>% #taking state and county fips and combinging into new column
+  select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
+   
+
+# View the modified data
+head(population_data)
+  
+
+
+
+
+```
+
