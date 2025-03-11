@@ -76,6 +76,7 @@ library(flextable) #make nice tables)
 library(zoo) #(rolling averages
 library(patchwork)
 library(sfd)
+library(lubridate)
 
 url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
 covid_raw<-read_csv(url)
@@ -135,17 +136,6 @@ pop_covid_raw <-read_csv(pop_url)
 1.Convert the STATE numeric into a character forced to 2 digits with a leading 0 (when needed)
 2.Convert the COUNTY numeric into a character forced to 3 digits with leading 0’s (when needed)
 3.Create a FIP variable the STATE numeric into a character forced to 2 digits with a leading 0 (when needed)
-```{r}
-#convert state numeric into a character forced to 2 digits w/ a leading 0
-#We can use the sprintf() function in base R to add leading zeros. The sprintf() function is powerful and versatile for string formatting.
-
-#pop_covid1<- pop_covid_raw %>%
- # mutate(state_fips = sprintf("%02s", STATE), # This ensures state is two digits 
-        # county_fips = sprintf("%03s", COUNTY)) %>%#This ensures county is 3 digits
-      # mutate(fips_code = paste(state_fips, county_fips, sep = ""))                         
-
-```
-
 
 # Given the above URL, and guidelines on string concatenation and formatting, read in the population data and (1) create a five digit FIP variable and only keep columns that contain “NAME” or “2021” (remember the tidyselect option found with ?dplyr::select). Additionally, remove all state level rows (e.g. COUNTY FIP == “000”)
 ```{r}
@@ -156,6 +146,7 @@ pop_covid1 <- pop_covid_raw %>%
   mutate(fips_code = paste(state_fips, county_fips, sep = "")) %>% #taking state and county fips and combinging into new column
   select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
 ```
+
 
 # Now, explore the data … what attributes does it have, what are the names of the columns? Do any match the COVID data we have? What are the dimensions… In a few sentences describe the data obtained after modification:
 ```{r}
@@ -187,15 +178,15 @@ The raw covid data matches some of the data in the pop_covid1 columns. Those col
 
 The dimensions of the pop_covid1 data set are 3144 rows and 19 columns.
 
+
 # What is the range of populations seen in Colorado counties in 2021?
 ```{r}
 # Get the range of populations for Colorado counties in 2021
-pop_covid1 %>%
-  filter(str_detect(STNAME, "Colorado")) %>%
-  summarise(min(POPESTIMATE2021),max(POPESTIMATE2021))
 
+range(pop_covid1$POPESTIMATE2021)
 ```
-# The min population of Colorado counties in 2021 is 741 people and the max is 737, 287 people.
+# The min population of Colorado counties in 2021 is from 54 people and the max is 9,809,462 people.
+
 
 # Join the population data to the Colorado COVID data and compute the per capita cumulative cases, per capita new cases, and per capita new deaths:
 ```{r}
@@ -206,13 +197,15 @@ covid1<-covid1 %>%
 merged_data <- covid1 %>%
   left_join(pop_covid1, by = "fips_code") #joining covid data on the left to the pop_covid 1
 
-# Calculate per per capita cumulative cases, per capita cases, and new deaths
+# Calculate per capita cumulative cases, per capita cases, and new deaths
 merged_data <- merged_data %>%
+  drop_na() %>%
   mutate(
-    cumulative_cases_percapita = cases / POPESTIMATE2021 * 100000,
-    newcases_per_capita = new_cases / POPESTIMATE2021 * 100000,
-    new_deaths_per_capita = deaths / POPESTIMATE2021* 100000
-  )
+    cumulative_cases_percapita = cases/ POPESTIMATE2021 * 100000,
+    per_capita_new_cases = new_cases / POPESTIMATE2021 * 100000,
+    per_capita_new_deaths = new_deaths / POPESTIMATE2021* 100000 )
+
+head(merged_data)
 ```
 
 # Generate (2) new tables. The first should show the 5 counties with the most cumulative cases per capita on 2021-01-01, and the second should show the 5 counties with the most NEW cases per capita on the same date. Your tables should have clear column names and descriptive captions.
@@ -225,23 +218,21 @@ top_cumulative_cases_per_capita <- merged_data %>%
   select(county, cumulative_cases_percapita) %>%
   head(5)
   
-  top_cum_cases_per_cap_flex<- flextable(top_cumulative_cases_per_capita) %>%
+ flextable::flextable(top_cumulative_cases_per_capita) %>%
   set_caption("Top 5 Counties with the Most Cumulative Cases Per Capita on 2021-01-01")
   
-  print(top_cum_cases_per_cap_flex)
 ```
 ```{r}
 # Table 2: Top 5 counties with the most new cases per capita
 top_new_cases_per_capita <- merged_data %>%
   filter(date=="2021-01-01") %>%
-  arrange(desc(newcases_per_capita)) %>%
-  select(county, newcases_per_capita) %>%
+  arrange(desc(per_capita_new_cases)) %>%
+  select(county, per_capita_new_cases) %>%
   head(5)
 
-top_new_cases_per_cap_flex<- flextable(top_new_cases_per_capita) %>%
+ flextable::flextable(top_new_cases_per_capita) %>%
   set_caption("Top 5 Counties with the Most New Cases Per Capita on 2021-01-01")
-  
-  print(top_new_cases_per_cap_flex)
+
 ```
 
 # Q 4: Question 4: Rolling thresholds
@@ -250,48 +241,66 @@ Filter the merged COVID/Population data to only include the last 14 days. Rememb
 (Hint: Dates are numeric in R and thus operations like max min, -, +, >, and< work.)
 ```{r}
 # Step 1-4: Filter, Summarize, Identify Watch List, and Display Results in One Flow
-merged_14d<-merged_data %>%
+
+county_14d_new_cases <-merged_data %>%
   filter(date >= max(date) - 13) %>%
   group_by(county) %>%
   summarize(
     total_new_cases_14d = sum(new_cases, na.rm = TRUE),
     cases_per_100k_14d = (total_new_cases_14d / POPESTIMATE2021[1]) * 100000
   ) %>%
-   filter(cases_per_100k_14d > 100) %>% #need to filter by the total new cases
-  arrange(desc(total_new_cases_14d)) #always filter before arrange
+   filter(cases_per_100k_14d > 100) %>%  #need to filter by the total new cases
+  arrange(desc(total_new_cases_14d))         #always filter before arrange 
   
 
-#to make watch list
-   watch_list <- filter(merged_14d,cases_per_100k_14d > 100)
+# Display Top 5 Counties Table
+county_14d_new_cases %>%
+  head(5) %>%
+  flextable::flextable() %>%
+  set_caption("Top 5 Colorado Counties with Most New Cases Per Capita (Last 14 Days") %>%
+  print()
    
-   
-    
-    # Display Top 5 Counties Table
-    merged_14d_flex<- merged_14d %>%
-      slice_max(total_new_cases_14d, n=5 )%>% #tell it which column to sort
-      flextable() %>%
-      set_caption("Top 5 Colorado Counties with Most New Cases Per Capita (Last 14 Days)") %>%
-      autofit() %>%
-      print()
 
+```
+
+# Watchlist
+```{r}
+#to make watch list
+   watch_list <- filter(county_14d_new_cases,cases_per_100k_14d > 100) %>%
+   head(5) %>%
+     flextable::flextable() %>%
+     set_caption("Top 5 Counties that have more than 100 new cases per 100,000 residents over the last 14 days") %>%
+     print()
 ```
 
 
 There are `r nrow(watch_list)` counties under watch.
+
 
 # Q5: Given we are assuming it is February 1st, 2022. Your leadership has asked you to determine what percentage of deaths in each county were attributed to COVID last year (2021). You eagerly tell them that with the current Census data, you can do this!
 
 From previous questions you should have a data.frame with daily COVID deaths in Colorado and the Census based, 2021 total deaths. For this question, you will find the ratio of total COVID deaths per county (2021) of all recorded deaths. In a plot of your choosing, visualize all counties where COVID deaths account for 20% or more of the annual death toll.
 
 ```{r}
-covid.county_2021totaldeaths <-merged_data %>%
-filter(date == my.date) %>%#filter to the my data 2021 date
- #create new data frame with sum of new_deaths
-   mutate(death_ratio = deaths / DEATHS2021) %>%#this gives the ratio of cumulative deaths to deaths of 2021
-filter(death_ratio >= .20)
+#To extract a element of a date object in R
+tmp.date = as.Date("2022-02-01")
+lubridate::year(tmp.date)
+lubridate::month(tmp.date)
+lubridate::yday(tmp.date)
+
+
+Colorado2021 <- covid1 %>%  #filter the data to 2022-02-01
+  filter(date == tmp.date) 
+
+#create new data frame with sum of new_deaths
+county_total_deaths21 <- Colorado2021 %>%
+  inner_join(pop_covid1, by = "fips_code") %>%
+  mutate(death_ratio = (deaths / POPESTIMATE2021) * 100) %>%
+  filter(death_ratio > .20)
+
   
 #barplot of counties of COVID deaths 20% or greater than total deaths in 2021
-ggplot(covid.county_2021totaldeaths, aes(x = reorder(county, death_ratio), y = death_ratio)) +
+ggplot(county_total_deaths21, aes(x = reorder(county, death_ratio), y = death_ratio)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   coord_flip() + 
   labs(
