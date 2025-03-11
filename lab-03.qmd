@@ -163,7 +163,7 @@ pop_covid_raw <-read_csv(pop_url)
 
 # Given the above URL, and guidelines on string concatenation and formatting, read in the population data and (1) create a five digit FIP variable and only keep columns that contain “NAME” or “2021” (remember the tidyselect option found with ?dplyr::select). Additionally, remove all state level rows (e.g. COUNTY FIP == “000”)
 ```{r}
-pop_covid1 <- pop_covid1 %>%
+pop_covid1 <- pop_covid_raw %>%
   filter(COUNTY != "000") %>% 
   mutate(state_fips = sprintf("%02s", STATE), #for character use %02s
          county_fips = sprintf("%03s", COUNTY)) %>%
@@ -301,8 +301,8 @@ From previous questions you should have a data.frame with daily COVID deaths in 
 covid.county_2021totaldeaths <-merged_data %>%
 filter(date == my.date) %>%#filter to the my data 2021 date
  #create new data frame with sum of new_deaths
-   mutate(death_ratio = deaths / DEATHS2021) %>% #this gives the ratio of cumulative deaths to deaths of 2021
-
+   mutate(death_ratio = deaths / DEATHS2021) %>%#this gives the ratio of cumulative deaths to deaths of 2021
+filter(death_ratio >= .20)
   
 #barplot of counties of COVID deaths 20% or greater than total deaths in 2021
 ggplot(covid.county_2021totaldeaths, aes(x = reorder(county, death_ratio), y = death_ratio)) +
@@ -383,14 +383,18 @@ pop_covid2_states <- pop_covid_raw %>%
   select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
    
 
-##rename fips column to match column name in pop_covid
-covid2_states<-covid2_states %>%
+#rename fips column to match column name in pop_covid
+covid2_states<- covid2_states %>%
   rename(fips_code=fips) #rename fips column to match column name in pop_covid2_states
+
+#rename STNAME column to match covid2_states state name column
+pop_covid2_states <- pop_covid2_states %>%
+  rename(state=STNAME)
 
 
 # Join state-level COVID data with the population data
 merged_data2 <- covid2_states %>%
-  left_join(pop_covid2_states, by= c("State" ="fips_code")) #joining covid data on the left to the pop_covid2_states
+  left_join(pop_covid2_states, by= c("state"= "fip")) #joining covid data on the left to the pop_covid2_states
 
 
 # Calculate daily new cases per capita
@@ -408,8 +412,8 @@ merged_data2<- merged_data2%>%
   ungroup()
 
 #filter states 
-merged_data2 <-merged_data2 %>%
-  filter(state == "")
+merged_data2 <- merged_data2 %>%
+  filter(state == "New York","Colorado","Alabama","Ohio")
 
 ```
 
