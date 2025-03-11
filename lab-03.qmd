@@ -94,8 +94,8 @@ my.state <- "Colorado"
 
 covid1 = covid_raw %>%
   filter(state == my.state) %>%
-  arrange(county, date) %>%
   group_by(county) %>%
+  arrange(county,date) %>%
   mutate(
     new_cases = cases - lag(cases, order_by = date),
     new_deaths = deaths - lag(deaths, order_by = date)
@@ -105,36 +105,22 @@ covid1 = covid_raw %>%
 head(covid1)
 ```
 
-# filter the data to include only records for the date my.date, which is 2022-02-01.
+# filter the data to include only records for the date my.date, which is 2022-02-01. Using your subset, generate (2) tables. The first should show the 5 counties with the most CUMULATIVE cases, and the second should show the 5 counties with the most NEW cases. Remember to use your my.date object as a proxy for today’s date:
 ```{r}
-top_cum_cases <- covid1 %>%
-  filter(date== my.date) %>%
-  arrange(desc(cases)) %>%
-  select(county, cases) %>%
-  head(5)
+filter(covid1, date == my.date) %>%
+  slice_max(cases, n = 5) %>%
+  select(Date = date, County = county, Cases = cases) %>%
+  flextable() %>%
+  set_caption(caption = "Top 5 Counties with the Most Cumulative Cases as of 2022-02-01")
 
-top_new_cases <- covid1 %>%
-  filter(date== my.date) %>%
-  arrange(desc(new_cases)) %>%
-  select(county, new_cases) %>%
-  head(5)
+filter(covid1, date == my.date) %>%
+  slice_max(cases, n = 5) %>%
+  select(Date = date, County = county, Cases = new_cases) %>%
+  flextable() %>%
+  set_caption(caption = "Top 5 Counties with the Most New Cases as of 2022-02-01")
+
 ```
 
-# Using your subset, generate (2) tables. The first should show the 5 counties with the most CUMULATIVE cases, and the second should show the 5 counties with the most NEW cases. Remember to use your my.date object as a proxy for today’s date:
-```{r}
-flex_top_cumcases = flextable(top_cum_cases)
-  flex_top_cumcases %>%
-  set_caption("Top 5 Counties with the Most Cumulative Cases as of 2022-02-01")
-  
-print(flex_top_cumcases)
-
-flex_new_cases = flextable(top_new_cases)
-flex_new_cases %>% 
-  set_caption("Top 5 Counties with the Most New Cases as of 2022-02-01")
-
-print(flex_new_cases)
-
-```
 
 # Q3: Normalizing Data
 Raw count data can be deceiving given the wide range of populations in Colorado countries. To help us normalize data counts, we need supplemental population data to be added. Population data is offered by the Census. Please read in this data.
@@ -394,7 +380,7 @@ pop_covid2_states <- pop_covid2_states %>%
 
 # Join state-level COVID data with the population data
 merged_data2 <- covid2_states %>%
-  left_join(pop_covid2_states, by= c("state"= "fip")) #joining covid data on the left to the pop_covid2_states
+  left_join(pop_covid2_states, by= c("state")) #joining covid data on the left to the pop_covid2_states
 
 
 # Calculate daily new cases per capita
