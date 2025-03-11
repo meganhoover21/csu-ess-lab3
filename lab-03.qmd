@@ -371,7 +371,8 @@ ggplot(pop_covid2_states, aes(x = date)) +
 ```
 
 # Briefly describe the influence scaling by population had on the analysis? Does it make some states look better? Some worse? How so?
- States that had lower populations populations, like Colorado, may show higher per capita case rates even if their total case counts are smaller. It makes New York look like it had less cases even though New York has a bigger population and most likely had more cases. Colorado looks worse because it has a lower population, which makes the rolling mean a bigger number.
+
+ States that had lower populations populations, like Colorado and Alabama, may show higher per capita case rates even if their total case counts are smaller. It makes New York look like it had less cases even though New York has a bigger population and most likely had more cases. Colorado looks worse because it has a lower population, which makes the rolling mean a bigger number.
  
  
  # Q7: For our final task, we will explore our first spatial example! In it we will calculate the Weighted Mean Center of the COVID-19 outbreak in the USA to better understand the movement of the virus through time.
@@ -382,40 +383,35 @@ ggplot(pop_covid2_states, aes(x = date)) +
 centroids_url <- "https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv"
 centroids <- read_csv(centroids_url)
 
-# Step 2: Join the COVID data with the centroids data based on the FIPS code
-covid_centroid<- covid_raw %>%
-  drop_na() %>%
-  left_join(centroids, by = c("fips" = "fips"))
 
-#3 Convert date column to Date type if it's not already
-  covid_centroid %>%
-    mutate(date = as.Date(date)) %>%
-                                         # Calculate the month from the date
-  mutate(month = format(date, "%m")) 
-                                    
-  
- # Calculate the Weighted Mean Center for each date
-weighted_centers <- covid_centroid%>%
-  drop_na() %>%
-  # Group by date to calculate the weighted mean center for each day
+
+#Please read in the data (readr::read_csv()); and join it to your raw COVID-19 data using the fips attributes
+spatial_join <- centroids %>%
+ inner_join(covid_raw, by =c("fips"="fips")) %>%
   group_by(date) %>%
-  summarise(
-    weighted_lon = sum(LON* cases) / sum(cases),
-    weighted_lat = sum(LAT * cases) / sum(cases),
-    total_cases = sum(cases)
-  ) %>%
-  ungroup()
+  summarise(weighted_lon= sum(LON*cases) / sum(cases),
+            weighted_lat = sum(LAT*cases) / sum(cases),
+            total_cases = sum(cases)) %>%
+  arrange(date) %>%
+  mutate(d = 1:n())
+
+#add a month column
+spatial_join <- spatial_join %>%
+  mutate(month=format(as.Date(spatial_join$date), "%m"))
+
 
 ```
+
  
- #plot
+ # Plot the weighted mean center (aes(x = LNG, y = LAT)), colored by month, and sized by total cases for each day. These points should be plotted over a map of the USA states which can be added to a ggplot object with:
 ```{r}
-ggplot(weighted_centers) +
+
+ggplot(spatial_join) +
   # Map of the USA states
   borders("state", fill = "gray90", colour = "white") +
   # Plot the weighted mean centers (points) over the USA map
-  geom_point(aes(x = weighted_lon, y = weighted_lat, color = format(date, "%m"), size = total_cases)) +
-  theme_minimal() +
+  geom_point(aes(x = weighted_lon, y = weighted_lat, colour =month, size = ""), alpha=.50) +
+  theme_linedraw() +
   labs(
     title = "COVID-19 Weighted Mean Center of the USA",
     subtitle = "Colored by Month, Sized by Total Cases",
