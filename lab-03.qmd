@@ -315,130 +315,59 @@ ggplot(county_total_deaths21, aes(x = reorder(county, death_ratio), y = death_ra
 # Q6: In this question, we are going to look at the story of 4 states and the impact scale can have on data interpretation. The states include: New York, Colorado, Alabama, and Ohio. Your task is to make a faceted bar plot showing the number of daily, new cases at the state level.
 ```{r}
 # Step 1: Group the data to the state level and calculate daily new cases
-state_data <- covid_raw %>%
-  filter(date== my.date)%>%
-  group_by(state, date) %>% 
-  summarize(
-    totalcum_cases = sum(cases, na.rm = TRUE), # Sum the cumulative cases for each state
-    totalcum_deaths = sum(deaths, na.rm = TRUE), # Sum the total deaths for each state
-    .groups = "drop"
-  ) %>%
-  arrange(state, date) %>%
-   mutate(
-    daily_new_cases = totalcum_cases - lag(totalcum_cases, default = first(totalcum_cases)),  # Calculate daily new cases
-    rolling_mean_7days = rollmean(daily_new_cases, k = 7, fill = NA, align = "center", na.rm= TRUE)  # 7-day rolling mean
-  )
-
-# Step 2: Filter for the four states (New York, Colorado, Alabama, Ohio)
- selected_states <- c("New York", "Colorado", "Alabama", "Ohio")
- 
-
-filtered_state_data <- state_data %>%
-  filter(state %in% selected_states)
+state_covid <- covid_raw %>%
+  group_by(date, state) %>%
+  drop_na() %>%
+  summarise(cases = sum(cases)) %>%
+  filter(state %in% c('New York', 'Ohio', 'Colorado', 'Alabama')) %>%
+  group_by(state) %>%
+  mutate(new_cases = cases - lag(cases),
+         roll = zoo:: rollmean(new_cases, k = 7, align = "right", fill = NA)) %>%
+  ungroup()
 
 ```
 
 # Using the modified data, make a facet plot of the daily new cases and the 7-day rolling mean. Your plot should use compelling geoms, labels, colors, and themes.
 ```{r}
 # Create a simpler bar plot with the 7-day rolling mean
-ggplot(filtered_state_data, aes(x = date)) +
-  # Bar plot for daily new cases
-  geom_bar(aes(y = daily_new_cases), stat = "identity", fill = "skyblue", color = "black", width = 0.8) +
-  # Line plot for 7-day rolling mean
-  geom_line(aes(y = rolling_mean_7days), color = "darkred", size = 1) +
-  # Facet by state
-  facet_wrap(~ state, scales = "free_y") +
-  # Labels and title
-  labs(
-    title = "Daily New COVID-19 Cases and 7-Day Rolling Mean by State",
-    x = "Date",
-    y = "Number of Cases",
-    caption = "Bars represent daily new cases. The red line is the 7-day rolling mean."
-  ) +
-  # Simplified theme
-  theme_minimal() 
+ggplot(state_covid, aes(x = date)) + 
+  geom_col(aes(y = new_cases), fill = "blue", col= NA) +
+  geom_line(aes(y = roll), col = "darkred", linewidth = 1) +
+  theme_linedraw()+
+  facet_wrap(~state, nrow = 2, scales = "free_y") +
+  labs(title = "Cumulative COVID-19 Cases", 
+       x = "Date", y = "Case Count")
 
 ```
 
 # The story of raw case counts can be misleading. To understand why, lets explore the cases per capita of each state. To do this, join the state COVID data to the population estimates and calculate the newcases/totalpopulation. Additionally, calculate the 7-day rolling mean of the new cases per capita counts. This is a tricky task and will take some thought, time, and modification to existing code (most likely)!
 ```{r}
-#create covid data frame with state info
-covid2_states <- covid_raw %>%
-  group_by(state, date) %>%  # Group by state and date to summarize data at the state level
-  mutate(
-    daily_new_cases = sum(cases) - lag(sum(cases), default = 0),  # Calculate daily new cases
-    daily_new_deaths = sum(deaths) - lag(sum(deaths), default = 0)) %>% # Calculate daily new deaths
-      ungroup()
-  
-  #create new pop data frame with state data
-pop_covid2_states <- pop_covid_raw %>%
-  mutate(state_fips = sprintf("%02s", STATE), #for character use %02s
-         county_fips = sprintf("%03s", COUNTY)) %>%
-  mutate(fips_code = paste(state_fips, county_fips, sep = "")) %>% #taking state and county fips and combinging into new column
-  select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
-   
-
-#rename fips column to match column name in pop_covid
-covid2_states<- covid2_states %>%
-  rename(fips_code=fips) #rename fips column to match column name in pop_covid2_states
-
-#rename STNAME column to match covid2_states state name column
-pop_covid2_states <- pop_covid2_states %>%
-  rename(state=STNAME)
-
-
-# Join state-level COVID data with the population data
-merged_data2 <- covid2_states %>%
-  left_join(pop_covid2_states, by= c("state")) #joining covid data on the left to the pop_covid2_states
-
-
-# Calculate daily new cases per capita
-merged_data2 <- merged_data2 %>%
-  mutate(
-    new_cases_per_capita = daily_new_cases / POPESTIMATE2021* 100000) # Cases per 100,000 people
-
-  
-# Calculate 7-day rolling mean of new cases per capita
-merged_data2<- merged_data2%>%
-  group_by(state) %>%
-  mutate(
-    rollingmean_per_capita = rollmean(new_cases_per_capita, k = 7, fill = NA, align = "center")
-  ) %>%
+#create new state dataframe 
+#Group by state and date to summarize data at the state level
+pop_covid2_states<- pop_covid1 %>%
+  group_by(STNAME) %>%  #Group by state and date to summarize data at the state level
+summarise(state_population = sum(POPESTIMATE2021)) %>%
+  inner_join(state_covid, by = c("STNAME" = "state")) %>% #join by ST and state from both dataframes
+  mutate(per_capita_cases = new_cases / state_population) %>%
+  group_by(STNAME) %>%
+  drop_na() %>%
+  mutate(roll = zoo::rollmean(per_capita_cases, k = 7, align = "right", fill = NA)
+         ) %>%
   ungroup()
-
-#filter states 
-merged_data2 <- merged_data2 %>%
-  filter(state == "New York","Colorado","Alabama","Ohio")
 
 ```
 
+
 # Using the per capita data, plot the 7-day rolling averages overlying each other (one plot) with compelling labels, colors, and theme.
 ```{r}
-#filter the 4 states
-filtered_state_data2<- merged_data2 %>%
-  filter(state %in% selected_states)
 
+#plot 7 day rolling averages overlying each other
+ggplot(pop_covid2_states, aes(x = date)) +
+  geom_line(aes(y = roll, col = STNAME), linewidth = 1) +
+  theme_linedraw() +
+  labs(title = "7-Day Rolling Mean of COVID-19 New Cases Per Capita by State",
+       x = "Date", y = "Case Count")
 
-
-# Plot the 7-day rolling averages of new cases per capita
-ggplot(filtered_state_data2, aes(x = date, y = rollingmean_per_capita, color = state)) +
-  geom_line(size = 1.2) +
-  labs(
-    title = "7-Day Rolling Mean of COVID-19 New Cases Per Capita by State",
-    x = "Date",
-    y = "7-Day Rolling Mean (New Cases Per 100,000 People)",
-    color = "State",
-    caption = "Each line represents the 7-day rolling mean of new cases per capita for each state."
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "bottom",
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank()
-  ) +
-  scale_color_brewer(palette = "Set1")
 ```
 
 # Briefly describe the influence scaling by population had on the analysis? Does it make some states look better? Some worse? How so?
