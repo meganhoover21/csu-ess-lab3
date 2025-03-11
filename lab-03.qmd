@@ -42,7 +42,31 @@ You should build this analysis in such a way that running it will extract the mo
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Q1: Take a moment to reflect on the value of open data: How does easy access to historical and real-time environmental data shape our understanding of climate trends, resource management, and public health? What happens when this data disappears or becomes inaccessible? The role of independent archiving and collaborative stewardship has never been more critical in ensuring scientific progress and accountability.
 
+It helps to understand patterns that may have not been recorded before. We are now able to have continuous data at all times, which helps shows trends, that couldn't be determined before. When this data becomes inaccessible, the ability to make accurate predictions decrease.
+
+# Q2:Lets pretend it in January 1st, 2022. You are a data scientist for the state of Colorado Department of Public Health.
+
+You’ve been tasked with giving a report to Governor Polis each morning about the most current COVID-19 conditions at the county level.
+
+As it stands, the Colorado Department of Public Health maintains a watch list of counties that are being monitored for worsening corona virus trends. There are six criteria used to place counties on the watch list:
+
+Doing fewer than 150 tests per 100,000 residents daily (over a 7-day average)
+More than 100 new cases per 100,000 residents over the past 14 days…
+25 new cases per 100,000 residents and an 8% test positivity rate
+10% or greater increase in COVID-19 hospitalized patients over the past 3 days
+Fewer than 20% of ICU beds available
+Fewer than 25% ventilators available
+Of these 6 conditions, you are in charge of monitoring condition number 2.
+
+To do this job well, you should set up a reproducible framework to communicate the following in a way that can be updated every time new data is released (daily):
+
+cumulative cases in the 5 worst counties
+total NEW cases in the 5 worst counties
+A list of safe counties
+A text report describing the total new cases, total cumulative cases, and number of safe counties.
+You should build this analysis in such a way that running it will extract the most current data straight from the NY-Times URL and the state name and date are parameters that can be changed allowing this report to be run for other states/dates.
 ```{r} 
 #Download libraries,read in COVID-19 Data, and prepare data table for calculations
 library(tidyverse) #data wrangling and visualization) 
@@ -50,6 +74,8 @@ library(tidyverse) #data wrangling and visualization)
 library(flextable) #make nice tables)
 
 library(zoo) #(rolling averages
+library(patchwork)
+library(sfd)
 
 url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
 covid_raw<-read_csv(url)
@@ -110,7 +136,8 @@ print(flex_new_cases)
 
 ```
 
-# Population data is offered by the Census. Please read in this data.
+# Q3: Normalizing Data
+Raw count data can be deceiving given the wide range of populations in Colorado countries. To help us normalize data counts, we need supplemental population data to be added. Population data is offered by the Census. Please read in this data.
 ```{r}
 pop_url <- 'https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/counties/totals/co-est2023-alldata.csv'
 
@@ -134,7 +161,7 @@ pop_covid_raw <-read_csv(pop_url)
 ```
 
 
-# Q 3.1: Given the above URL, and guidelines on string concatenation and formatting, read in the population data and (1) create a five digit FIP variable and only keep columns that contain “NAME” or “2021” (remember the tidyselect option found with ?dplyr::select). Additionally, remove all state level rows (e.g. COUNTY FIP == “000”)
+# Given the above URL, and guidelines on string concatenation and formatting, read in the population data and (1) create a five digit FIP variable and only keep columns that contain “NAME” or “2021” (remember the tidyselect option found with ?dplyr::select). Additionally, remove all state level rows (e.g. COUNTY FIP == “000”)
 ```{r}
 pop_covid1 <- pop_covid1 %>%
   filter(COUNTY != "000") %>% 
@@ -144,7 +171,7 @@ pop_covid1 <- pop_covid1 %>%
   select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
 ```
 
-# Q 3.2: Now, explore the data … what attributes does it have, what are the names of the columns? Do any match the COVID data we have? What are the dimensions… In a few sentences describe the data obtained after modification:
+# Now, explore the data … what attributes does it have, what are the names of the columns? Do any match the COVID data we have? What are the dimensions… In a few sentences describe the data obtained after modification:
 ```{r}
 #Hint: names(), dim(), nrow(), str(), glimpse, skimr,…
 # Explore the population data
@@ -174,7 +201,7 @@ The raw covid data matches some of the data in the pop_covid1 columns. Those col
 
 The dimensions of the pop_covid1 data set are 3144 rows and 19 columns.
 
-# Q 3.3: What is the range of populations seen in Colorado counties in 2021?
+# What is the range of populations seen in Colorado counties in 2021?
 ```{r}
 # Get the range of populations for Colorado counties in 2021
 pop_covid1 %>%
@@ -184,7 +211,7 @@ pop_covid1 %>%
 ```
 # The min population of Colorado counties in 2021 is 741 people and the max is 737, 287 people.
 
-# Q 3.4: Join the population data to the Colorado COVID data and compute the per capita cumulative cases, per capita new cases, and per capita new deaths:
+# Join the population data to the Colorado COVID data and compute the per capita cumulative cases, per capita new cases, and per capita new deaths:
 ```{r}
 covid1<-covid1 %>%
   rename(fips_code=fips) #rename fips column to match column name in pop_covid1
@@ -202,7 +229,7 @@ merged_data <- merged_data %>%
   )
 ```
 
-# Q 3.5: Generate (2) new tables. The first should show the 5 counties with the most cumulative cases per capita on 2021-01-01, and the second should show the 5 counties with the most NEW cases per capita on the same date. Your tables should have clear column names and descriptive captions.
+# Generate (2) new tables. The first should show the 5 counties with the most cumulative cases per capita on 2021-01-01, and the second should show the 5 counties with the most NEW cases per capita on the same date. Your tables should have clear column names and descriptive captions.
 (Hint: Use `flextable::flextable() and flextable::set_caption())
 ```{r}
 # Table 1: Top 5 counties with the most cumulative cases per capita
@@ -266,11 +293,9 @@ merged_14d<-merged_data %>%
 
 There are `r nrow(watch_list)` counties under watch.
 
-# Q 5: Given we are assuming it is February 1st, 2022. Your leadership has asked you to determine what percentage of deaths in each county were attributed to COVID last year (2021). You eagerly tell them that with the current Census data, you can do this!
+# Q5: Given we are assuming it is February 1st, 2022. Your leadership has asked you to determine what percentage of deaths in each county were attributed to COVID last year (2021). You eagerly tell them that with the current Census data, you can do this!
 
 From previous questions you should have a data.frame with daily COVID deaths in Colorado and the Census based, 2021 total deaths. For this question, you will find the ratio of total COVID deaths per county (2021) of all recorded deaths. In a plot of your choosing, visualize all counties where COVID deaths account for 20% or more of the annual death toll.
-
-Dates in R
 
 ```{r}
 covid.county_2021totaldeaths <-merged_data %>%
@@ -291,10 +316,12 @@ ggplot(covid.county_2021totaldeaths, aes(x = reorder(county, death_ratio), y = d
   theme_minimal()
 ```
 
-# Q 6: In this question, we are going to look at the story of 4 states and the impact scale can have on data interpretation. The states include: New York, Colorado, Alabama, and Ohio. Your task is to make a faceted bar plot showing the number of daily, new cases at the state level.
+
+# Q6: In this question, we are going to look at the story of 4 states and the impact scale can have on data interpretation. The states include: New York, Colorado, Alabama, and Ohio. Your task is to make a faceted bar plot showing the number of daily, new cases at the state level.
 ```{r}
 # Step 1: Group the data to the state level and calculate daily new cases
 state_data <- covid_raw %>%
+  filter(date== my.date)%>%
   group_by(state, date) %>% 
   summarize(
     totalcum_cases = sum(cases, na.rm = TRUE), # Sum the cumulative cases for each state
@@ -316,7 +343,7 @@ filtered_state_data <- state_data %>%
 
 ```
 
-#Q 6.2: Using the modified data, make a facet plot of the daily new cases and the 7-day rolling mean. Your plot should use compelling geoms, labels, colors, and themes.
+# Using the modified data, make a facet plot of the daily new cases and the 7-day rolling mean. Your plot should use compelling geoms, labels, colors, and themes.
 ```{r}
 # Create a simpler bar plot with the 7-day rolling mean
 ggplot(filtered_state_data, aes(x = date)) +
@@ -338,7 +365,7 @@ ggplot(filtered_state_data, aes(x = date)) +
 
 ```
 
-# Q 6.3: The story of raw case counts can be misleading. To understand why, lets explore the cases per capita of each state. To do this, join the state COVID data to the population estimates and calculate the newcases/totalpopulation. Additionally, calculate the 7-day rolling mean of the new cases per capita counts. This is a tricky task and will take some thought, time, and modification to existing code (most likely)!
+# The story of raw case counts can be misleading. To understand why, lets explore the cases per capita of each state. To do this, join the state COVID data to the population estimates and calculate the newcases/totalpopulation. Additionally, calculate the 7-day rolling mean of the new cases per capita counts. This is a tricky task and will take some thought, time, and modification to existing code (most likely)!
 ```{r}
 #create covid data frame with state info
 covid2_states <- covid_raw %>%
@@ -356,12 +383,208 @@ pop_covid2_states <- pop_covid_raw %>%
   select(fips_code, contains("NAME"), contains("2021")) #selecting only flips_code with all the name parameters and year 2021
    
 
-# View the modified data
-head(population_data)
+##rename fips column to match column name in pop_covid
+covid2_states<-covid2_states %>%
+  rename(fips_code=fips) #rename fips column to match column name in pop_covid2_states
+
+
+# Join state-level COVID data with the population data
+merged_data2 <- covid2_states %>%
+  left_join(pop_covid2_states, by= c("State" ="fips_code")) #joining covid data on the left to the pop_covid2_states
+
+
+# Calculate daily new cases per capita
+merged_data2 <- merged_data2 %>%
+  mutate(
+    new_cases_per_capita = daily_new_cases / POPESTIMATE2021* 100000) # Cases per 100,000 people
+
   
+# Calculate 7-day rolling mean of new cases per capita
+merged_data2<- merged_data2%>%
+  group_by(state) %>%
+  mutate(
+    rollingmean_per_capita = rollmean(new_cases_per_capita, k = 7, fill = NA, align = "center")
+  ) %>%
+  ungroup()
 
-
-
+#filter states 
+merged_data2 <-merged_data2 %>%
+  filter(state == "")
 
 ```
 
+# Using the per capita data, plot the 7-day rolling averages overlying each other (one plot) with compelling labels, colors, and theme.
+```{r}
+#filter the 4 states
+filtered_state_data2<- merged_data2 %>%
+  filter(state %in% selected_states)
+
+
+
+# Plot the 7-day rolling averages of new cases per capita
+ggplot(filtered_state_data2, aes(x = date, y = rollingmean_per_capita, color = state)) +
+  geom_line(size = 1.2) +
+  labs(
+    title = "7-Day Rolling Mean of COVID-19 New Cases Per Capita by State",
+    x = "Date",
+    y = "7-Day Rolling Mean (New Cases Per 100,000 People)",
+    color = "State",
+    caption = "Each line represents the 7-day rolling mean of new cases per capita for each state."
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  ) +
+  scale_color_brewer(palette = "Set1")
+```
+
+# Briefly describe the influence scaling by population had on the analysis? Does it make some states look better? Some worse? How so?
+ States that had lower populations populations, like Colorado, may show higher per capita case rates even if their total case counts are smaller. It makes New York look like it had less cases even though New York has a bigger population and most likely had more cases. Colorado looks worse because it has a lower population, which makes the rolling mean a bigger number.
+ 
+ 
+ # Q7: For our final task, we will explore our first spatial example! In it we will calculate the Weighted Mean Center of the COVID-19 outbreak in the USA to better understand the movement of the virus through time.
+ 
+ # Please read in the data (readr::read_csv()); and join it to your raw COVID-19 data using the fips attributes
+```{r}
+# Step 1: Read the centroid data (latitude and longitude of county centers)
+centroids_url <- "https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv"
+centroids <- read_csv(centroids_url)
+
+# Step 2: Join the COVID data with the centroids data based on the FIPS code
+covid_centroid<- covid_raw %>%
+  drop_na() %>%
+  left_join(centroids, by = c("fips" = "fips"))
+
+#3 Convert date column to Date type if it's not already
+  covid_centroid %>%
+    mutate(date = as.Date(date)) %>%
+                                         # Calculate the month from the date
+  mutate(month = format(date, "%m")) 
+                                    
+  
+ # Calculate the Weighted Mean Center for each date
+weighted_centers <- covid_centroid%>%
+  drop_na() %>%
+  # Group by date to calculate the weighted mean center for each day
+  group_by(date) %>%
+  summarise(
+    weighted_lon = sum(LON* cases) / sum(cases),
+    weighted_lat = sum(LAT * cases) / sum(cases),
+    total_cases = sum(cases)
+  ) %>%
+  ungroup()
+
+```
+ 
+ #plot
+```{r}
+ggplot(weighted_centers) +
+  # Map of the USA states
+  borders("state", fill = "gray90", colour = "white") +
+  # Plot the weighted mean centers (points) over the USA map
+  geom_point(aes(x = weighted_lon, y = weighted_lat, color = format(date, "%m"), size = total_cases)) +
+  theme_minimal() +
+  labs(
+    title = "COVID-19 Weighted Mean Center of the USA",
+    subtitle = "Colored by Month, Sized by Total Cases",
+    x = "Longitude",
+    y = "Latitude",
+    color = "Month",
+    size = "Total Cases"
+  ) +
+  theme(legend.position = "bottom")
+```
+ 
+ #In a few sentences, describe the movement of the COVID-19 weighted mean throughout the USA and possible drivers of its movement given your knowledge of the outbreak hot spots.
+ 
+ It appears to have broken out mainly between Missouri and Arkansas during January-March. It was also spotted in the West, but lower cases than in the two other states. From Missouri it moved East early on and then drifted back West towards the spring/summer months. This could be because COVID was not known in the winter months, and by the time it was figured to be an epidemic many people had traveled. Also, during COVID, many people traveled to outdoor recreational areas in the spring months; this could explain why more people developed cases in the Missouri/ Arkansas area.
+ 
+ 
+ # Q8:As extra credit, extend your analysis in problem three to also compute the weighted mean center of daily COVID deaths.
+
+Make two plots next to each other (using patchwork) showing cases in red and deaths in navy. Once completed describe the differences in the plots and what they mean about the spatial patterns seen with COVID impacts.
+```{r}
+#join previous merged data with the centroid data
+problem8<- merged_data %>%
+  rename(fips=fips_code) %>%
+  drop_na() %>%
+  left_join(centroids, by = c("fips" = "fips"))
+
+problem8 %>%
+    mutate(date = as.Date(date)) %>%
+                                         # Calculate the month from the date
+  mutate(month = format(date, "%m")) 
+
+
+# Calculate the Weighted Mean Center for each date
+weighted_centers_death <- problem8%>%
+  drop_na() %>%
+  # Group by date to calculate the weighted mean center for each day
+  group_by(date) %>%
+  summarise(
+    weighted_lon = sum(LON* deaths) / sum(deaths),
+    weighted_lat = sum(LAT * deaths) / sum(deaths),
+    total_deaths = sum(deaths)
+  ) %>%
+  ungroup()
+
+
+#make one for cases now
+weighted_centers_cases <- problem8 %>%
+  mutate(date = as.Date(date)) %>%
+  mutate(month = format(date, "%m")) %>%
+  group_by(date) %>%
+  summarise(
+    weighted_lon_cases = sum(LON * cases) / sum(cases),
+    weighted_lat_cases = sum(LAT * cases) / sum(cases),
+    total_cases = sum(cases)
+  ) %>%
+  ungroup()
+
+
+# Plot for Cases (in red)
+plot_cases <- ggplot(weighted_centers_cases) +
+  borders("state", fill = "gray90", colour = "white") +
+  geom_point(aes(x = weighted_lon_cases, y = weighted_lat_cases, color ="red", 
+             size =total_cases)) +
+  theme_minimal() +
+  labs(
+    title = "COVID-19 Weighted Mean Center - Cases",
+    subtitle = "Colored by Total Cases",
+    x = "Longitude",
+    y = "Latitude",
+    color = "Total Cases"
+  ) +
+  theme(legend.position = "bottom")
+
+# Plot for Deaths (in navy)
+plot_deaths <- ggplot(weighted_centers_death) +
+  borders("state", fill = "gray90", colour = "white") +
+  geom_point(aes(x = weighted_lon, y = weighted_lat, color = "navy", 
+            )) +
+  theme_minimal() +
+  labs(
+    title = "COVID-19 Weighted Mean Center - Deaths",
+    subtitle = "Colored by Total Deaths",
+    x = "Longitude",
+    y = "Latitude",
+    color = "total_deaths") +
+  theme(legend.position = "bottom")
+
+plot_cases | plot_deaths
+
+p1 <- ggplot(weighted_centers_cases, aes(weighted_lon_cases, weighted_lat_cases)) + geom_point()
+p2 <- ggplot(weighted_centers_death, aes(weighted_lon, weighted_lat)) + geom_point()
+
+p1|p2
+```
+
+
+# Once completed describe the differences in the plots and what they mean about the spatial patterns seen with COVID impacts.
+
+There appears to be more cases between -105 to -104.75 degrees longitude, and there also seems to be more deaths in that range as well. It also seems like there are more cases than there are deaths though. 
+ 
